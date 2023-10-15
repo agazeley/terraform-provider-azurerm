@@ -37,6 +37,14 @@ type NetworkInterface struct {
 	SubnetId string `tfschema:"subnet_id"`
 }
 
+type ScalingProperties struct {
+	Capacity int64 `tfschema:"capacity"`
+}
+
+type UserProfile struct {
+	PreferredEmail string `tfschema:"preferred_email"`
+}
+
 type DeploymentModel struct {
 	ResourceGroupName      string                                     `tfschema:"resource_group_name"`
 	Name                   string                                     `tfschema:"name"`
@@ -51,7 +59,9 @@ type DeploymentModel struct {
 	FrontendPublic         []FrontendPublic                           `tfschema:"frontend_public"`
 	FrontendPrivate        []FrontendPrivate                          `tfschema:"frontend_private"`
 	NetworkInterface       []NetworkInterface                         `tfschema:"network_interface"`
+	ScalingProperties      []ScalingProperties                        `tfschema:"scaling"`
 	Tags                   map[string]string                          `tfschema:"tags"`
+	UserProfile            []UserProfile                              `tfschema:"user_profile"`
 }
 
 type DeploymentResource struct{}
@@ -179,7 +189,37 @@ func (m DeploymentResource) Arguments() map[string]*pluginsdk.Schema {
 			},
 		},
 
+		"scaling": {
+			Type:     pluginsdk.TypeList,
+			Optional: true,
+			ForceNew: false,
+			Elem: &pluginsdk.Resource{
+				Schema: map[string]*pluginsdk.Schema{
+					"capacity": {
+						Type:         pluginsdk.TypeInt,
+						Required:     true,
+						ValidateFunc: validation.IntPositive,
+					},
+				},
+			},
+		},
+
 		"tags": commonschema.Tags(),
+
+		"user_profile": {
+			Type:     pluginsdk.TypeList,
+			Optional: true,
+			ForceNew: false,
+			Elem: &pluginsdk.Resource{
+				Schema: map[string]*pluginsdk.Schema{
+					"preferred_email": {
+						Type:         pluginsdk.TypeString,
+						Required:     true,
+						ValidateFunc: validation.StringIsNotEmpty,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -222,7 +262,7 @@ func (m DeploymentResource) Create() sdk.ResourceFunc {
 
 			if !response.WasNotFound(existing.HttpResponse) {
 				if err != nil {
-					return fmt.Errorf("retreiving %s: %v", id, err)
+					return fmt.Errorf("retrieving %s: %v", id, err)
 				}
 				return meta.ResourceRequiresImport(m.ResourceType(), id)
 			}
@@ -280,6 +320,18 @@ func (m DeploymentResource) Create() sdk.ResourceFunc {
 
 			if len(model.NetworkInterface) > 0 {
 				prop.NetworkProfile.NetworkInterfaceConfiguration.SubnetId = pointer.FromString(model.NetworkInterface[0].SubnetId)
+			}
+
+			if len(model.ScalingProperties) > 0 {
+				prop.ScalingProperties = &nginxdeployment.NginxDeploymentScalingProperties{
+					Capacity: pointer.FromInt64(model.ScalingProperties[0].Capacity),
+				}
+			}
+
+			if len(model.UserProfile) > 0 && model.UserProfile[0].PreferredEmail != "" {
+				prop.UserProfile = &nginxdeployment.NginxDeploymentUserProfile{
+					PreferredEmail: &model.UserProfile[0].PreferredEmail,
+				}
 			}
 
 			req.Properties = prop
@@ -377,6 +429,18 @@ func (m DeploymentResource) Read() sdk.ResourceFunc {
 						}
 					}
 
+					if scaling := props.ScalingProperties; scaling != nil {
+						output.ScalingProperties = []ScalingProperties{{
+							Capacity: pointer.ToInt64(props.ScalingProperties.Capacity),
+						}}
+					}
+
+					if userProfile := props.UserProfile; userProfile != nil && userProfile.PreferredEmail != nil {
+						output.UserProfile = []UserProfile{{
+							PreferredEmail: pointer.ToString(props.UserProfile.PreferredEmail),
+						}}
+					}
+
 					flattenedIdentity, err := identity.FlattenSystemAndUserAssignedMapToModel(model.Identity)
 					if err != nil {
 						return fmt.Errorf("flattening `identity`: %v", err)
@@ -432,6 +496,18 @@ func (m DeploymentResource) Update() sdk.ResourceFunc {
 
 			if meta.ResourceData.HasChange("diagnose_support_enabled") {
 				req.Properties.EnableDiagnosticsSupport = pointer.FromBool(model.DiagnoseSupportEnabled)
+			}
+
+			if meta.ResourceData.HasChange("scaling") && len(model.ScalingProperties) > 0 {
+				req.Properties.ScalingProperties = &nginxdeployment.NginxDeploymentScalingProperties{
+					Capacity: pointer.FromInt64(model.ScalingProperties[0].Capacity),
+				}
+			}
+
+			if meta.ResourceData.HasChange("user_profile") && len(model.UserProfile) > 0 {
+				req.Properties.UserProfile = &nginxdeployment.NginxDeploymentUserProfile{
+					PreferredEmail: pointer.FromString(model.UserProfile[0].PreferredEmail),
+				}
 			}
 
 			if err := client.DeploymentsUpdateThenPoll(ctx, *id, req); err != nil {
