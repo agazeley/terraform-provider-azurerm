@@ -39,6 +39,8 @@ func TestAccNginxDeployment_basic(t *testing.T) {
 			Config: r.basic(data),
 			Check: acceptance.ComposeTestCheckFunc(
 				check.That(data.ResourceName).ExistsInAzure(r),
+				check.That(data.ResourceName).Key("scaling").HasValue("10"),
+				check.That(data.ResourceName).Key("user_profile").Exists(),
 			),
 		},
 		data.ImportStep(),
@@ -84,6 +86,8 @@ func (a DeploymentResource) basic(data acceptance.TestData) string {
 	return fmt.Sprintf(`
 
 
+
+
 %s
 
 resource "azurerm_nginx_deployment" "test" {
@@ -100,6 +104,15 @@ resource "azurerm_nginx_deployment" "test" {
   network_interface {
     subnet_id = azurerm_subnet.test.id
   }
+
+  scaling {
+    capacity = 10
+  }
+
+  user_profile {
+    preferred_email = "test@test.com"
+  }
+
   tags = {
     foo = "bar"
   }
@@ -109,6 +122,8 @@ resource "azurerm_nginx_deployment" "test" {
 
 func (a DeploymentResource) update(data acceptance.TestData) string {
 	return fmt.Sprintf(`
+
+
 
 
 %s
@@ -128,6 +143,14 @@ resource "azurerm_nginx_deployment" "test" {
     subnet_id = azurerm_subnet.test.id
   }
 
+  scaling {
+    capacity = 20
+  }
+
+  user_profile {
+    preferred_email = "testing@test.com"
+  }
+
   tags = {
     foo = "bar2"
   }
@@ -137,6 +160,8 @@ resource "azurerm_nginx_deployment" "test" {
 
 func (a DeploymentResource) identityUser(data acceptance.TestData) string {
 	return fmt.Sprintf(`
+
+
 
 
 %s
@@ -164,6 +189,10 @@ resource "azurerm_nginx_deployment" "test" {
 
   network_interface {
     subnet_id = azurerm_subnet.test.id
+  }
+
+  scaling {
+    capacity = 10
   }
 }
 `, a.template(data), data.RandomInteger)

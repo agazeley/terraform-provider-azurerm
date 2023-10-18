@@ -68,6 +68,14 @@ resource "azurerm_nginx_deployment" "example" {
   network_interface {
     subnet_id = azurerm_subnet.example.id
   }
+
+  scaling {
+    capacity = 20
+  }
+
+  user_profile {
+    preferred_email = "user@test.com"
+  }
 }
 ```
 
@@ -99,7 +107,11 @@ The following arguments are supported:
 
 * `network_interface` - (Optional) One or more `network_interface` blocks as defined below. Changing this forces a new Nginx Deployment to be created.
 
+* `scaling` - (Optional) One or more `scaling` blocks as defined below.
+
 * `tags` - (Optional) A mapping of tags which should be assigned to the Nginx Deployment.
+
+* `user_profile` - (Optional) One or more `user_profile` blocks as defined below.
 
 ---
 
@@ -138,6 +150,20 @@ A `logging_storage_account` block supports the following:
 A `network_interface` block supports the following:
 
 * `subnet_id` - (Required) Specify The SubNet Resource ID to this Nginx Deployment.
+
+---
+
+A `scaling` block supports the following:
+
+* `capacity` - (Required) Specify the number of NGINX capacity units for this NGINX deployment.
+
+-> **Note** For more information on NGINX capacity units, please refer to the [NGINX scaling guidance documentation](https://docs.nginx.com/nginxaas/azure/quickstart/scaling/)
+
+---
+
+A `user_profile` block supports the following:
+
+* `preferred_email` - (Required) Specify the preferred support contact email address of the user used for sending alerts and notification.
 
 ## Attributes Reference
 
